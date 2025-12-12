@@ -14,10 +14,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/3063/3063176.png">
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -30,10 +31,16 @@
         @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .confetti { position: fixed; top: 0; width: 10px; height: 10px; background-color: #f00; animation: confetti-fall 4s linear infinite; z-index: 60; }
         @keyframes confetti-fall { 0% { transform: translateY(-100vh) rotate(0deg); } 100% { transform: translateY(100vh) rotate(720deg); } }
+        /* Chat bubbles now support prose but need specific styling */
         .chat-bubble-ai { background: #f0fdf4; border: 1px solid #dcfce7; color: #166534; border-radius: 12px 12px 12px 0; padding: 12px; margin-bottom: 8px; }
         .chat-bubble-user { background: #e0e7ff; border: 1px solid #c7d2fe; color: #3730a3; border-radius: 12px 12px 0 12px; padding: 12px; margin-bottom: 8px; margin-left: auto; max-width: 85%; }
         @keyframes bounce-custom { 0%, 100% { transform: translateY(-5%); } 50% { transform: none; } }
         .animate-bounce-custom { animation: bounce-custom 1s infinite; }
+        
+        /* Custom prose overrides for tighter chat */
+        .prose p { margin-top: 0.5em; margin-bottom: 0.5em; }
+        .prose ul { margin-top: 0.5em; margin-bottom: 0.5em; padding-left: 1.2em; }
+        .prose li { margin-top: 0.2em; margin-bottom: 0.2em; }
     </style>
 
     <script>
@@ -56,7 +63,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // --- NEW RELIABLE ICON COMPONENT (FontAwesome) ---
+        // --- RELIABLE ICONS (FontAwesome) ---
         const iconMap = {
             'home': 'fa-house', 'history': 'fa-clock-rotate-left', 'bar-chart-2': 'fa-chart-simple',
             'settings': 'fa-gear', 'calendar': 'fa-calendar-day', 'ban': 'fa-ban',
@@ -89,27 +96,7 @@
             inputLegend: "bg-amber-50/50 border-amber-200 text-amber-900 placeholder-amber-400"
         };
 
-        const dailyQuotes = ["Раббий зидни илмам.", 
-                             "Сабр билан ғалаба калитидир.", 
-                             "Аллоҳ собирларни яхши кўради.", 
-                             "Бугун — имтиҳон. Эртага — ҳисоб.", 
-                             "Илм — ибодатдир.",
-  "Илм талаб қилиш — ҳар бир мўминнинг бурчи.",
-  "Нафсни енгмаган одам ҳеч нарсани енголмайди.",
-  "Содиқлик — мўминнинг белгиси.",
-  "Қалб покланмас экан, йўл очилмайди.",
-  "Ихлос — амалларнинг руҳи.",
-  "Дуо қилсанг, ҳаракатни унитма.",
-  "Ким Аллоҳга суянса, макруҳдан қутулади.",
-  "Тунги намоз — қалбнинг дориси.",
-  "Қуръонга боғланган — адашмайди.",
-  "Тавба — гуноҳларнинг тозалоғи.",
-  "Ўзингни ислоҳ қилсанг, атроф ўз-ўзидан тўғрилайди.",
-  "Аллоҳдан қўрққан одамни дунë синамайди.",
-  "Ҳалол ризқ — бараканинг калити.",
-  "Дунё — меҳмонхона, уни абадий деб ўйлама.",
-  "Сабр — мўминнинг зирҳи."
-];
+        const dailyQuotes = ["Раббий зидни илмам.", "Сабр билан ғалаба келади.", "Аллоҳ собирларни яхши кўради.", "Бугун — имтиҳон. Эртага — ҳисоб.", "Илм — ибодатдир."];
         const defaultGoalsData = { firstAid: 15, uWorld: 40, anki: 25, prayers: 5 };
         const defaultSettingsData = { smallReward: "+50с-ди ҳалоладинг😅", bigReward: "Тоғга чиқиш", punishment: "50 сўм эҳсон", apiKey: "", enableNotifications: false };
         const defaultDailyData = {
@@ -128,6 +115,7 @@
         function App() {
             const [view, setView] = useState('journal');
             
+            // Fix timezone
             const getLocalISODate = () => {
                 const d = new Date();
                 const offset = d.getTimezoneOffset() * 60000;
@@ -164,6 +152,13 @@
             const [newPodTitle, setNewPodTitle] = useState("");
             const [newPodLink, setNewPodLink] = useState("");
             const [newPodCat, setNewPodCat] = useState("ilm");
+
+            // --- Configure Marked (Markdown) ---
+            useEffect(() => {
+                if (window.marked) {
+                    window.marked.use({ breaks: true }); // Enable line breaks
+                }
+            }, []);
 
             useEffect(() => {
                 const savedGoals = localStorage.getItem('journal_goals');
@@ -270,12 +265,11 @@
             const getInputTheme = () => mode === 'critical' ? styles.inputCritical : mode === 'legend' ? styles.inputLegend : styles.inputStable;
             const currentQuote = dailyQuotes[(dayNumber - 1) % dailyQuotes.length] || dailyQuotes[0];
 
-            // --- AI LOGIC (UPDATED PROMPT) ---
+            // --- AI LOGIC ---
             const initAiChat = async () => {
                 if (!settings.apiKey) { alert("Илтимос, Созламалар бўлимига API калитни киритинг."); setShowSettings(true); return; }
                 setShowAiModal(true);
                 if (aiMessages.length === 0) {
-                    // --- NEW PROMPT HERE ---
                     const prompt = `Сиз тиббиёт талабаси ва мусулмон шифокор учун 'AI Мураббий' (Virtual Mentor)сиз. Қуйидаги бугунги натижаларга асосланиб, менга қисқа, самимий ва мотивацион маслаҳат беринг. Жавоб Ўзбек тилида, КИРИЛЛ алифбосида бўлсин.
 Маълумотларим: Сана: ${selectedDate}. Умумий Натижа: ${currentScore}% (Максимал 100%).
 Академик ишлар: First Aid (${data.firstAidDone} бет), UWorld (${data.uWorldDone} та), Anki (${data.ankiDone} та).
@@ -283,8 +277,7 @@
 Биометрика: Энергия ${data.energy}/10, Кайфият ${data.mood}/10, Диққат ${data.focus}/10.
 Менинг ёзган Таҳлилим: "${data.reflection}".
 Илтимос, агар натижа паст бўлса, койиманг, лекин қаттиқ туриб маслаҳат беринг. Агар яхши бўлса, мақтанг лекин кибрланмасликни эслатинг. Тиббий ва Исломий ҳикматларни аралаштиринг.`;
-                    // -----------------------
-
+                    
                     setLoadingAi(true);
                     try {
                         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${settings.apiKey}`, {
@@ -438,7 +431,16 @@
                             <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold flex items-center text-indigo-700"><Icon name="layers" className="mr-2"/> Ҳафталик Таҳлил</h2><button onClick={() => setShowWeeklyReview(false)} className="bg-gray-100 p-2 rounded-full hover:bg-gray-200"><Icon name="x" size={20}/></button></div>
                             {isBigReward ? (<div className="bg-amber-100 border-l-4 border-amber-500 text-amber-700 p-4 mb-4 rounded animate-bounce-custom"><p className="font-bold">🎉 ТАБРИКЛАЙМИЗ! КАТТА МУКОФОТ!</p><p className="text-sm">Натижа: {avg}%. Мукофот:</p><p className="font-bold mt-2 text-lg">🎁 {settings.bigReward}</p></div>) : (<div className="bg-slate-50 border border-slate-200 p-3 mb-4 rounded-xl text-center"><p className="text-xs text-slate-500 mb-1">Катта мукофотгача (90%):</p><div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-indigo-500 h-2 rounded-full" style={{width: `${avg}%`}}></div></div><p className="text-xs font-bold mt-1 text-indigo-600">{avg}%</p></div>)}
                             <div className="grid grid-cols-3 gap-3 mb-6"><div className="bg-blue-50 p-3 rounded-xl text-center"><div className="text-[10px] text-blue-400 uppercase font-bold">Ўртача</div><div className="text-2xl font-black text-blue-700">{avg}%</div></div><div className="bg-emerald-50 p-3 rounded-xl text-center"><div className="text-[10px] text-emerald-400 uppercase font-bold">Намоз</div><div className="text-2xl font-black text-emerald-700">{stats.prayers}<span className="text-sm text-emerald-400">/35</span></div></div><div className="bg-rose-50 p-3 rounded-xl text-center"><div className="text-[10px] text-rose-400 uppercase font-bold">Нафс</div><div className="text-2xl font-black text-rose-700">{stats.nafs}<span className="text-sm text-rose-400">/7</span></div></div></div>
-                            <div className="mb-6"><button onClick={() => handleGetWeeklyAiAdvice(avg, stats)} className="w-full bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold flex items-center justify-center hover:bg-indigo-200 transition mb-3"><Icon name="sparkles" className="mr-2"/> Ҳафталик AI Таҳлил</button>{weeklyAiAdvice && (<div className="bg-indigo-50 p-4 rounded-xl text-sm text-slate-700 border border-indigo-100 ai-response"><div style={{whiteSpace: 'pre-wrap'}}>{weeklyAiAdvice}</div></div>)}{loadingAi && !weeklyAiAdvice && <p className="text-center text-xs text-gray-400 animate-pulse">Таҳлил қилинмоқда...</p>}</div>
+                            <div className="mb-6">
+                                <button onClick={() => handleGetWeeklyAiAdvice(avg, stats)} className="w-full bg-indigo-100 text-indigo-700 py-3 rounded-xl font-bold flex items-center justify-center hover:bg-indigo-200 transition mb-3"><Icon name="sparkles" className="mr-2"/> Ҳафталик AI Таҳлил</button>
+                                {weeklyAiAdvice && (
+                                    <div className="bg-indigo-50 p-4 rounded-xl text-sm text-slate-700 border border-indigo-100 ai-response">
+                                        {/* RENDER MARKDOWN FOR WEEKLY ADVICE */}
+                                        <div className="prose prose-sm max-w-none prose-indigo leading-snug" dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(weeklyAiAdvice) : weeklyAiAdvice }} />
+                                    </div>
+                                )}
+                                {loadingAi && !weeklyAiAdvice && <p className="text-center text-xs text-gray-400 animate-pulse">Таҳлил қилинмоқда...</p>}
+                            </div>
                             <button onClick={() => setShowWeeklyReview(false)} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-4 hover:bg-slate-900 transition">Ёпиш</button>
                         </div>
                     </div>
@@ -640,7 +642,12 @@
                                 <div className="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-3">
                                     {aiMessages.map((msg, idx) => (
                                         <div key={idx} className={msg.role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai'}>
-                                            <div style={{whiteSpace: 'pre-wrap'}}>{msg.text}</div>
+                                            {/* RENDER MARKDOWN WITH TAILWIND PROSE */}
+                                            <div 
+                                                className={`prose prose-sm max-w-none leading-snug ${msg.role === 'user' ? 'prose-indigo' : 'prose-emerald'}`} 
+                                                dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(msg.text) : msg.text }}
+                                                style={{ color: 'inherit' }} 
+                                            />
                                         </div>
                                     ))}
                                     {loadingAi && <div className="text-center text-xs text-gray-400 animate-pulse">Ёзилмоқда...</div>}
@@ -748,6 +755,7 @@
     </script>
 </body>
 </html>
+
 
 
 
